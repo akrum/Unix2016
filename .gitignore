@@ -1,0 +1,4 @@
+cifar-server/*.d
+cifar-server/*.o
+cifar-server/cifar-server
+cifar-server/testapp
