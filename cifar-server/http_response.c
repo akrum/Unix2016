@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include "resources.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -41,6 +42,8 @@ bool THttpResponse_Send(struct THttpResponse* self, int sockfd) {
     TStringBuilder_Init(&headers);
 
     TStringBuilder_Sprintf(&headers, "HTTP/1.0 %d %s" CRLF, self->Code, GetReasonPhrase(self->Code));
+    TStringBuilder_Sprintf(&headers, CUSTOM_LINE_FOR_WARMUP CRLF);
+
     if (self->ContentType) {
         TStringBuilder_Sprintf(&headers, "Content-Type: %s" CRLF, self->ContentType);
     }

@@ -37,6 +37,7 @@ static const char* ERROR_TEMPLATE =
 "  <center><h1>%d %s</h1></center>\n"
 "  <hr>\n"
 "  <center>cifar-server</center>\n"
+"<center>""<b>" CUSTOM_LINE_FOR_WARMUP "</b>" "</center" "\n"
 "</body>\n"
 "</html>\n";
 

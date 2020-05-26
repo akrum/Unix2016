@@ -89,12 +89,12 @@ static bool RunServerImpl(int sockfd) {
         }
         if (pid == 0) { // this is the child process
             #ifdef DEBUG
-            fprintf(stderr, "Clild born\n");
+            fprintf(stderr, "Child born\n");
             #endif
             close(sockfd); // child doesn't need the listener
             ServeClient(newfd);
             #ifdef DEBUG
-            fprintf(stderr, "Clild dead\n");
+            fprintf(stderr, "Child dead\n");
             #endif
             exit(0);
         }
