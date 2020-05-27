@@ -175,9 +175,52 @@ static bool ReadWholeFile(int fd, struct TStringBuilder* body) {
     return true;
 }
 
+int percent_url_decode(char* out, const char* in)
+{
+    static const char tbl[256] = {
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+         0, 1, 2, 3, 4, 5, 6, 7,  8, 9,-1,-1,-1,-1,-1,-1,
+        -1,10,11,12,13,14,15,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,10,11,12,13,14,15,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1
+    };
+    char c, v1, v2, *beg=out;
+    if(in != NULL) {
+        while((c=*in++) != '\0') {
+            if(c == '%') {
+                if((v1=tbl[(unsigned char)*in++]) < 0 || 
+                   (v2=tbl[(unsigned char)*in++]) < 0) {
+                    *beg = '\0';
+                    return -1;
+                }
+                c = (v1<<4)|v2;
+            }
+            *out++ = c;
+        }
+    }
+    *out = '\0';
+    return 0;
+}
+
 void SendStaticFile(struct THttpResponse* response, const char* path) {
     printf("requested path: %s\n", path);
-    char *passed_real_path = realpath(path, NULL);
+
+    char *path_decoded = calloc(strlen(path) + 1, sizeof(char));
+    percent_url_decode(path_decoded, path);
+    printf("real path decoded: %s\n", path_decoded);
+
+    char *passed_real_path = realpath(path_decoded, NULL);
     if(NULL == passed_real_path)
     {
         perror("realpath for passed:");
@@ -202,8 +245,10 @@ void SendStaticFile(struct THttpResponse* response, const char* path) {
     }
 
     response->ContentType = GuessContentType(path);
-    int fd = open(path, O_RDONLY);
+    int fd = open(passed_real_path, O_RDONLY);
     if (fd == -1) {
+        perror("open file:");
+        printf("fd is -1\n");
         CreateErrorPage(response, HTTP_NOT_FOUND);
         return;
     }
