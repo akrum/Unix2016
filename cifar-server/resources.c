@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 /**
  * Page data
@@ -175,6 +176,31 @@ static bool ReadWholeFile(int fd, struct TStringBuilder* body) {
 }
 
 void SendStaticFile(struct THttpResponse* response, const char* path) {
+    printf("requested path: %s\n", path);
+    char *passed_real_path = realpath(path, NULL);
+    if(NULL == passed_real_path)
+    {
+        perror("realpath for passed:");
+        CreateErrorPage(response, HTTP_NOT_FOUND);
+        return;
+    }
+    printf("real path: %s\n", passed_real_path);
+
+    char *static_real_path = realpath("./static", NULL);
+    if(NULL == static_real_path)
+    {
+        perror("realpath for static:");
+        CreateErrorPage(response, HTTP_INTERNAL_SERVER_ERROR);
+        return;
+    }
+    printf("static real path: %s\n", static_real_path);
+
+    if(strstr(passed_real_path, static_real_path) == NULL)
+    {
+        CreateErrorPage(response, HTTP_BAD_REQUEST);
+        return;
+    }
+
     response->ContentType = GuessContentType(path);
     int fd = open(path, O_RDONLY);
     if (fd == -1) {
