@@ -3,3 +3,4 @@ cifar-server/*.o
 cifar-server/cifar-server
 cifar-server/testapp
 cifar-server/cifar/data_batch_1.bin
+cifar-server/static/static_sub/

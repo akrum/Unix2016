@@ -13,6 +13,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <dirent.h>
+
+#define DEBUG_MODE 0
+
+#if(DEBUG_MODE == 1)
+#define DEBUG_PRINT(...) {do{printf(__VA_ARGS__);}while(0);}
+#else
+#define DEBUG_PRINT(...)
+#endif
 
 /**
  * Page data
@@ -65,6 +74,18 @@ static const char* INDEX_TEMPLATE_HEADER =
 "<body>\n"
 "  <div class=\"container\">\n"
 "    <img src=\"static/logo_en.svg\" width=\"232\" height=\"97\" class=\"float-right\">\n"
+"    <h1>" PAGE_TITLE "</h1>\n";
+
+static const char* DIR_OUTPUT_HEADER_TEMPLATE =
+"<html>\n"
+"<head>\n"
+"  <title>" PAGE_TITLE "</title>\n"
+"  <meta charset=\"utf-8\">\n"
+"  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, shrink-to-fit=no\">\n"
+"  <style>.pic { width: 48px; height: 48px; }</style>"
+"</head>\n"
+"<body>\n"
+"  <div class=\"container\">\n"
 "    <h1>" PAGE_TITLE "</h1>\n";
 
 static const char* INDEX_TEMPLATE_FOOTER =
@@ -175,6 +196,69 @@ static bool ReadWholeFile(int fd, struct TStringBuilder* body) {
     return true;
 }
 
+bool listdir(const char *name, int indent, struct THttpResponse* response)
+{
+    DIR *dir = opendir(name);
+    struct dirent *entry;
+
+    if (NULL == dir)
+    {
+        perror("opendir");
+        return false;
+    }
+
+    bool is_success = true;
+
+    for(entry = readdir(dir); entry != NULL; entry = readdir(dir)) {
+        if (DT_DIR == entry->d_type) {
+            char path[1024];
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+                continue;
+            snprintf(path, sizeof(path), "%s/%s", name, entry->d_name);
+
+            TStringBuilder_AppendCStr(&response->Body, "<p>\n");
+            for(int i = 0; i < indent; i++)
+            {
+                TStringBuilder_Sprintf(&response->Body, "%s", "-");
+            }
+
+            TStringBuilder_Sprintf(&response->Body, "[%s]\n", entry->d_name);
+            TStringBuilder_AppendCStr(&response->Body, "</p>\n");
+
+            is_success = listdir(path, indent + 1, response) & is_success;
+            if(!is_success)
+            {
+                return false;
+            }
+        }
+        else
+        {
+            TStringBuilder_AppendCStr(&response->Body, "<p>\n");
+            for(int i = 0; i < indent; i++)
+            {
+                TStringBuilder_Sprintf(&response->Body, "%s", "-");
+            }
+            TStringBuilder_Sprintf(&response->Body,"%s\n", entry->d_name);
+            TStringBuilder_AppendCStr(&response->Body, "</p>\n");
+        }
+    }
+    closedir(dir);
+    return is_success;
+}
+
+bool prepare_page_for_the_dir_listing(const char *path, const char *path_requested, struct THttpResponse* response)
+{
+    TStringBuilder_AppendCStr(&response->Body, DIR_OUTPUT_HEADER_TEMPLATE);
+    TStringBuilder_Sprintf(&response->Body, "<h3>Dir %s listing:</h3>\n", path_requested);
+    TStringBuilder_AppendCStr(&response->Body, "<div class=\"form-group\">\n");
+
+    bool ex_result = listdir(path, 1, response);
+
+    TStringBuilder_AppendCStr(&response->Body, "</div>\n");
+    TStringBuilder_AppendCStr(&response->Body, INDEX_TEMPLATE_FOOTER);
+    return ex_result;
+}
+
 int percent_url_decode(char* out, const char* in)
 {
     static const char tbl[256] = {
@@ -218,7 +302,7 @@ void SendStaticFile(struct THttpResponse* response, const char* path) {
 
     char *path_decoded = calloc(strlen(path) + 1, sizeof(char));
     percent_url_decode(path_decoded, path);
-    printf("real path decoded: %s\n", path_decoded);
+    DEBUG_PRINT("real path decoded: %s\n", path_decoded);
 
     char *passed_real_path = realpath(path_decoded, NULL);
     if(NULL == passed_real_path)
@@ -227,7 +311,7 @@ void SendStaticFile(struct THttpResponse* response, const char* path) {
         CreateErrorPage(response, HTTP_NOT_FOUND);
         return;
     }
-    printf("real path: %s\n", passed_real_path);
+    DEBUG_PRINT("real path: %s\n", passed_real_path);
 
     char *static_real_path = realpath("./static", NULL);
     if(NULL == static_real_path)
@@ -236,11 +320,29 @@ void SendStaticFile(struct THttpResponse* response, const char* path) {
         CreateErrorPage(response, HTTP_INTERNAL_SERVER_ERROR);
         return;
     }
-    printf("static real path: %s\n", static_real_path);
+    DEBUG_PRINT("static real path: %s\n", static_real_path);
 
     if(strstr(passed_real_path, static_real_path) == NULL)
     {
         CreateErrorPage(response, HTTP_BAD_REQUEST);
+        return;
+    }
+
+    struct stat file_stat_buf;
+    if(stat(passed_real_path, &file_stat_buf) < 0)
+    {
+        perror("dir stat error:");
+        
+        return;
+    }
+    
+    if(S_ISDIR(file_stat_buf.st_mode))
+    {
+        DEBUG_PRINT("given path is a folder\n");
+        if(prepare_page_for_the_dir_listing(passed_real_path, path, response) == false)
+        {
+            CreateErrorPage(response, HTTP_INTERNAL_SERVER_ERROR);
+        }
         return;
     }
 
