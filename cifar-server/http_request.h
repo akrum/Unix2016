@@ -8,6 +8,7 @@ struct THttpRequest {
     char* Method;
     char* Path;
     char* QueryString;
+    bool should_keep_alive;
 };
 
 void THttpRequest_Init(struct THttpRequest* self);

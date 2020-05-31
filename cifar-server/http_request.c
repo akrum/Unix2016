@@ -10,6 +10,7 @@
 #include <string.h>
 
 #define RECV_BUF_SIZE 4096
+#define CONNECTION_KEEP_ALIVE "Connection: keep-alive"
 
 /**
  * THttpRequest
@@ -17,6 +18,7 @@
 
 void THttpRequest_Init(struct THttpRequest* self) {
     memset(self, 0, sizeof(struct THttpRequest));
+    self->should_keep_alive = false;
 }
 
 void THttpRequest_Destroy(struct THttpRequest* self) {
@@ -58,8 +60,10 @@ static bool ParseRequestLine(char* line, struct THttpRequest* out) {
 
 static bool ParseHeaderLine(char* line, struct THttpRequest* out) {
     // TODO
-    (void)line;
-    (void)out;
+    if(strcmp(line, CONNECTION_KEEP_ALIVE) == 0)
+    {
+        out->should_keep_alive = true;
+    }
     return true;
 }
 
@@ -93,12 +97,18 @@ static void ProcessLine(struct THttpRequestParser* parser, struct THttpRequest* 
     if (parser->Line.Length == 0) {
         // We do not know how to parse request body, if any:(
         parser->Complete = true;
-    } else {
-        if (parser->LineNum == 0) {
-            if (!ParseRequestLine(parser->Line.Data, request)) {
+    } 
+    else 
+    {
+        if (parser->LineNum == 0) 
+        {
+            if (!ParseRequestLine(parser->Line.Data, request)) 
+            {
                 parser->Invalid = true;
             }
-        } else {
+        }
+        else
+        {
             if (!ParseHeaderLine(parser->Line.Data, request)) {
                 parser->Invalid = true;
             }
