@@ -16,6 +16,15 @@
 #include <string.h>
 
 #define BACKLOG 10   // how many pending connections queue will hold
+#define DEBUG_MODE 1
+
+#if(DEBUG_MODE == 1)
+#define DEBUG_PRINT(...) {do{printf(__VA_ARGS__);}while(0);}
+#define DEBUG_PRINT_IF(condition, ...) {do{if((condition)){printf(__VA_ARGS__);};}while(0);}
+#else
+#define DEBUG_PRINT(...)
+#define DEBUG_PRINT_IF(condition, ...)
+#endif
 
 static int CreateSocketToListen(uint16_t port) {
     int sockfd;
@@ -81,6 +90,8 @@ static bool RunServerImpl(int sockfd) {
             perror("accept");
             continue;
         }
+
+        DEBUG_PRINT("received new connection so creating new process\n");
 
         const pid_t pid = fork();
         if (pid == -1) {

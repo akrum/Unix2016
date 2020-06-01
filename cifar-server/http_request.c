@@ -142,9 +142,9 @@ static size_t Consume(struct THttpRequestParser* parser, const char* data, size_
     return total;
 }
 
-bool THttpRequest_Receive(struct THttpRequest* self, int sockfd) {
+http_receive_result_t THttpRequest_Receive(struct THttpRequest* self, int sockfd) {
     char buf[RECV_BUF_SIZE];
-    bool result = true;
+    http_receive_result_t result = RECEIVE_RESULT_SUCCESS;
 
     struct THttpRequestParser parser;
     THttpRequestParser_Init(&parser);
@@ -156,12 +156,12 @@ bool THttpRequest_Receive(struct THttpRequest* self, int sockfd) {
                 continue;
             }
             perror("recv");
-            result = false;
+            result = RECEIVE_RESULT_ERROR;
             break;
         }
         if (ret == 0) {
             // other peer has disconnected
-            result = false;
+            result = RECEIVE_RESULT_DISCONNECTED;
             break;
         }
 
@@ -174,7 +174,7 @@ bool THttpRequest_Receive(struct THttpRequest* self, int sockfd) {
         }
     }
     if (parser.Invalid) {
-        result = false;
+        result = RECEIVE_RESULT_BAD_REQUEST;
     }
 
     THttpRequestParser_Destroy(&parser);

@@ -10,11 +10,22 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <assert.h>
 
 #ifdef DEBUG
 static const char* SafeStr(const char* value) {
     return (value != NULL) ? value : "<null>";
 }
+#endif
+
+#define DEBUG_MODE 0
+
+#if(DEBUG_MODE == 1)
+#define DEBUG_PRINT(...) {do{printf(__VA_ARGS__);}while(0);}
+#define DEBUG_PRINT_IF(condition, ...) {do{if((condition)){printf(__VA_ARGS__);};}while(0);}
+#else
+#define DEBUG_PRINT(...)
+#define DEBUG_PRINT_IF(condition, ...)
 #endif
 
 static void Handle(const struct THttpRequest* request, struct THttpResponse* response) {
@@ -51,20 +62,54 @@ static void Handle(const struct THttpRequest* request, struct THttpResponse* res
 }
 
 void ServeClient(int sockfd) {
-    struct THttpRequest req;
-    THttpRequest_Init(&req);
-    struct THttpResponse resp;
-    THttpResponse_Init(&resp);
+    bool should_keep_alive = true;
 
-    if (THttpRequest_Receive(&req, sockfd)) {
-        Handle(&req, &resp);
-    } else {
-        CreateErrorPage(&resp, HTTP_BAD_REQUEST);
+    while(should_keep_alive)
+    {
+        struct THttpRequest req;
+        struct THttpResponse resp;
+
+        THttpRequest_Init(&req);
+        THttpResponse_Init(&resp);
+
+        http_receive_result_t receive_result = THttpRequest_Receive(&req, sockfd);
+        if (RECEIVE_RESULT_SUCCESS == receive_result) 
+        {
+            DEBUG_PRINT("received good request, now handling it\n");
+
+            Handle(&req, &resp);
+            THttpResponse_Send(&resp, sockfd);
+
+            DEBUG_PRINT_IF(req.should_keep_alive, 
+                           "received keep alive connection flag so not closing the socket\n");
+            should_keep_alive &= req.should_keep_alive;
+        } 
+        else if(RECEIVE_RESULT_BAD_REQUEST == receive_result)
+        {
+            CreateErrorPage(&resp, HTTP_BAD_REQUEST);
+            THttpResponse_Send(&resp, sockfd);
+            should_keep_alive = false;
+        }
+        else if(RECEIVE_RESULT_ERROR == receive_result)
+        {
+            CreateErrorPage(&resp, HTTP_INTERNAL_SERVER_ERROR);
+            THttpResponse_Send(&resp, sockfd);
+            should_keep_alive = false;
+        }
+        else if(RECEIVE_RESULT_DISCONNECTED == receive_result)
+        {
+            DEBUG_PRINT("the connection was interrupted so closing the socket\n");
+
+            close(sockfd);
+            return;
+        }
+        else
+        {
+            assert(false); // unreachable
+        }
+
+        THttpResponse_Destroy(&resp);
+        THttpRequest_Destroy(&req);
     }
 
-    THttpResponse_Send(&resp, sockfd);
-    THttpResponse_Destroy(&resp);
-    THttpRequest_Destroy(&req);
-
-    close(sockfd);
 }

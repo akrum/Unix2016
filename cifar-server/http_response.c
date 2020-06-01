@@ -11,6 +11,7 @@
 #include <string.h>
 
 #define CRLF "\r\n"
+#define CONNECTION_KEEP_ALIVE "Connection: keep-alive"
 
 const char* GetReasonPhrase(enum EHttpCode code) {
     switch (code) {
@@ -41,7 +42,8 @@ bool THttpResponse_Send(struct THttpResponse* self, int sockfd) {
     struct TStringBuilder headers;
     TStringBuilder_Init(&headers);
 
-    TStringBuilder_Sprintf(&headers, "HTTP/1.0 %d %s" CRLF, self->Code, GetReasonPhrase(self->Code));
+    TStringBuilder_Sprintf(&headers, "HTTP/1.1 %d %s" CRLF, self->Code, GetReasonPhrase(self->Code));
+    TStringBuilder_Sprintf(&headers, CONNECTION_KEEP_ALIVE CRLF);
     TStringBuilder_Sprintf(&headers, CUSTOM_LINE_FOR_WARMUP CRLF);
 
     if (self->ContentType) {
