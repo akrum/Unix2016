@@ -18,7 +18,7 @@ static const char* SafeStr(const char* value) {
 }
 #endif
 
-#define DEBUG_MODE 0
+#define DEBUG_MODE 1
 
 #if(DEBUG_MODE == 1)
 #define DEBUG_PRINT(...) {do{printf(__VA_ARGS__);}while(0);}
@@ -72,7 +72,7 @@ void ServeClient(int sockfd) {
         THttpRequest_Init(&req);
         THttpResponse_Init(&resp);
 
-        http_receive_result_t receive_result = THttpRequest_Receive(&req, sockfd);
+        http_receive_result_t receive_result = THttpRequest_Receive(&req, sockfd, should_keep_alive);
         if (RECEIVE_RESULT_SUCCESS == receive_result) 
         {
             DEBUG_PRINT("received good request, now handling it\n");

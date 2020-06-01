@@ -8,9 +8,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <poll.h>
 
 #define RECV_BUF_SIZE 4096
 #define CONNECTION_KEEP_ALIVE "Connection: keep-alive"
+#define TIMEOUT_FOR_KEEP_ALIVE_CONNECTIONS 10 * 1000  // 10 seconds
 
 /**
  * THttpRequest
@@ -142,38 +144,71 @@ static size_t Consume(struct THttpRequestParser* parser, const char* data, size_
     return total;
 }
 
-http_receive_result_t THttpRequest_Receive(struct THttpRequest* self, int sockfd) {
+http_receive_result_t THttpRequest_Receive(struct THttpRequest* self, int sockfd, bool connection_is_kept_alive)
+{
     char buf[RECV_BUF_SIZE];
     http_receive_result_t result = RECEIVE_RESULT_SUCCESS;
 
     struct THttpRequestParser parser;
     THttpRequestParser_Init(&parser);
 
-    while (1) {
-        ssize_t ret = recv(sockfd, buf, RECV_BUF_SIZE, 0);
-        if (ret == -1) {
-            if (errno == EINTR || errno == EAGAIN) {
-                continue;
+    while (connection_is_kept_alive) 
+    {
+        if(connection_is_kept_alive)
+        {
+            struct pollfd poll_file_descriptor;
+            poll_file_descriptor.fd = sockfd; // your socket handler 
+            poll_file_descriptor.events = POLLIN;
+            switch(poll(&poll_file_descriptor, 1, TIMEOUT_FOR_KEEP_ALIVE_CONNECTIONS)) // nfds = 1
+            {
+                case -1:
+                {
+                    perror("poll error:");
+                    result = RECEIVE_RESULT_ERROR;
+                    connection_is_kept_alive = false;
+                    break;
+                }
+                case 0:
+                {
+                    result = RECEIVE_RESULT_DISCONNECTED;
+                    connection_is_kept_alive = false;
+                    break;
+                }
+                default:
+                {
+                    result = RECEIVE_RESULT_SUCCESS;
+                }
             }
-            perror("recv");
-            result = RECEIVE_RESULT_ERROR;
-            break;
-        }
-        if (ret == 0) {
-            // other peer has disconnected
-            result = RECEIVE_RESULT_DISCONNECTED;
-            break;
         }
 
-        const size_t consumed = Consume(&parser, buf, ret, self);
-        if (consumed != (size_t)ret) {
-            parser.Invalid = true;
-        }
-        if (parser.Complete) {
-            break;
+        if(connection_is_kept_alive)
+        {
+            ssize_t ret = recv(sockfd, buf, RECV_BUF_SIZE, 0);
+            if (-1 == ret) {
+                if (errno == EINTR || errno == EAGAIN) {
+                    continue;
+                }
+                perror("recv");
+                result = RECEIVE_RESULT_ERROR;
+                break;
+            }
+            if (0 == ret) {
+                // other peer has disconnected
+                result = RECEIVE_RESULT_DISCONNECTED;
+                break;
+            }
+
+            const size_t consumed = Consume(&parser, buf, ret, self);
+            if (consumed != (size_t)ret) {
+                parser.Invalid = true;
+            }
+            if (parser.Complete) {
+                break;
+            }
         }
     }
-    if (parser.Invalid) {
+    if (parser.Invalid) 
+    {
         result = RECEIVE_RESULT_BAD_REQUEST;
     }
 

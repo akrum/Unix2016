@@ -1,7 +1,7 @@
 TARGET = cifar-server
 TEST_TARGET = testapp
 
-CFLAGS += -Wall -Wextra --std=gnu99 -g -O2 -D_GNU_SOURCE -MMD
+CFLAGS += -Wall -Wextra --std=gnu99 -g -O0 -D_GNU_SOURCE -MMD
 
 SRCS = \
 	bmp.c \
@@ -20,6 +20,7 @@ all: $(TARGET) $(TEST_TARGET)
 
 $(TARGET): main.o $(SRCS:%.c=%.o)
 	$(CC) $(CFLAGS) -o $@ $^
+	echo "OPTIMISATIONS ARE TURNED OFF, PLEASE ENABLE THEM AGAIN (-O2) AFTER EVERYTHING IS DONE"
 
 $(TEST_TARGET): tests.o $(SRCS:%.c=%.o)
 	$(CC) $(CFLAGS) -o $@ $^

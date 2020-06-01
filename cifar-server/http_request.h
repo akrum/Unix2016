@@ -20,5 +20,5 @@ typedef enum http_receive_result
 }http_receive_result_t;
 
 void THttpRequest_Init(struct THttpRequest* self);
-http_receive_result_t THttpRequest_Receive(struct THttpRequest* self, int sockfd);
+http_receive_result_t THttpRequest_Receive(struct THttpRequest* self, int sockfd, bool connection_is_kept_alive);
 void THttpRequest_Destroy(struct THttpRequest* self);
