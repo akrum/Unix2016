@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <assert.h>
 #include "resources.h"
 
 #include <stdio.h>
@@ -33,6 +34,8 @@ const char* GetReasonPhrase(enum EHttpCode code) {
 void THttpResponse_Init(struct THttpResponse* self) {
     self->Code = HTTP_OK;
     self->ContentType = NULL;
+    self->should_use_sendfile = false;
+    self->file_path_requested = NULL;
     TStringBuilder_Init(&self->Body);
 }
 
@@ -55,13 +58,32 @@ bool THttpResponse_Send(struct THttpResponse* self, int sockfd) {
     // fprintf(stderr, "RESPONSE {%s}\n", headers.Data);
 
     bool result = true;
+
     if (!SendAll(sockfd, headers.Data, headers.Length)) {
         result = false;
     }
+
     if (result && self->Body.Length != 0) {
         if (!SendAll(sockfd, self->Body.Data, self->Body.Length)) {
             result = false;
         }
+    }
+
+    if(result && self->should_use_sendfile)
+    {
+        assert(self->file_path_requested != NULL);
+        int sent_file_fd = open(self->file_path_requested, O_RDONLY);
+        
+        if (sent_file_fd == -1) 
+        {
+            perror("open file:");
+            printf("fd is -1\n");
+            CreateErrorPage(self, HTTP_NOT_FOUND);
+            return false;
+        }
+
+        result &= send_with_sendfile(sockfd, sent_file_fd);
+        close(sent_file_fd);
     }
 
     TStringBuilder_Destroy(&headers);

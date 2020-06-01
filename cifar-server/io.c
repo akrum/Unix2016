@@ -3,10 +3,18 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+#if !defined(__APPLE__)
+#include <sys/sendfile.h>
+#endif
+
+#include <assert.h>
 #include <errno.h>
 #include <stdio.h>
 
-bool SendAll(int sockfd, const void* data, size_t len) {
+#define MAX_RESEND_ATTEMPTS 5
+
+bool SendAll(int sockfd, const void* data, size_t len)
+{
     while (len != 0) {
         ssize_t ret = send(sockfd, data, len, 0);
         if (ret == -1) {
@@ -20,4 +28,30 @@ bool SendAll(int sockfd, const void* data, size_t len) {
         len -= ret;
     }
     return true;
+}
+
+bool send_with_sendfile(int sock_fd, int file_fd)
+{
+    #if defined(__APPLE__) || defined(__OSX__)
+    int attempt_counter = 0;
+    while(attempt_counter < MAX_RESEND_ATTEMPTS)
+    {
+        ssize_t ret = sendfile(sock_fd, file_fd, 0, 0, NULL, 0);
+        if(ret == -1)
+        {
+            if (errno == EINTR || errno == EAGAIN) 
+            {
+                attempt_counter++;
+                continue;
+            }
+            perror("sendfile error:");
+            return false;
+        }
+        return true;
+    }
+    #else
+    assert(false);  // not implemented
+    #endif
+
+    return false;
 }

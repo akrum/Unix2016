@@ -15,6 +15,7 @@
 #include <assert.h>
 #include <dirent.h>
 
+#define USING_SENDFILE 0
 #define DEBUG_MODE 0
 
 #if(DEBUG_MODE == 1)
@@ -347,6 +348,11 @@ void SendStaticFile(struct THttpResponse* response, const char* path) {
     }
 
     response->ContentType = GuessContentType(path);
+
+    #if (USING_SENDFILE == 1)
+    response->should_use_sendfile = true;
+    response->file_path_requested = passed_real_path;
+    #else
     int fd = open(passed_real_path, O_RDONLY);
     if (fd == -1) {
         perror("open file:");
@@ -358,4 +364,5 @@ void SendStaticFile(struct THttpResponse* response, const char* path) {
         CreateErrorPage(response, HTTP_INTERNAL_SERVER_ERROR);
     }
     close(fd);
+    #endif
 }

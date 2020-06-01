@@ -16,6 +16,8 @@ struct THttpResponse {
     enum EHttpCode Code;
     const char* ContentType; // static string
     struct TStringBuilder Body;
+    bool should_use_sendfile;
+    char *file_path_requested;  // guaranteed that the field will be valid if should_use_sendfile is true
 };
 
 const char* GetReasonPhrase(enum EHttpCode code);
