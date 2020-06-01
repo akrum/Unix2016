@@ -151,8 +151,9 @@ http_receive_result_t THttpRequest_Receive(struct THttpRequest* self, int sockfd
 
     struct THttpRequestParser parser;
     THttpRequestParser_Init(&parser);
+    bool connection_is_still_alive = true;
 
-    while (connection_is_kept_alive) 
+    do 
     {
         if(connection_is_kept_alive)
         {
@@ -165,13 +166,13 @@ http_receive_result_t THttpRequest_Receive(struct THttpRequest* self, int sockfd
                 {
                     perror("poll error:");
                     result = RECEIVE_RESULT_ERROR;
-                    connection_is_kept_alive = false;
+                    connection_is_still_alive = false;
                     break;
                 }
                 case 0:
                 {
                     result = RECEIVE_RESULT_DISCONNECTED;
-                    connection_is_kept_alive = false;
+                    connection_is_still_alive = false;
                     break;
                 }
                 default:
@@ -181,7 +182,7 @@ http_receive_result_t THttpRequest_Receive(struct THttpRequest* self, int sockfd
             }
         }
 
-        if(connection_is_kept_alive)
+        if(connection_is_still_alive)
         {
             ssize_t ret = recv(sockfd, buf, RECV_BUF_SIZE, 0);
             if (-1 == ret) {
@@ -206,7 +207,8 @@ http_receive_result_t THttpRequest_Receive(struct THttpRequest* self, int sockfd
                 break;
             }
         }
-    }
+    }while (connection_is_still_alive);
+
     if (parser.Invalid) 
     {
         result = RECEIVE_RESULT_BAD_REQUEST;
