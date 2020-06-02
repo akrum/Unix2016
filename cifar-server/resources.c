@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/mman.h>
 #include <unistd.h>
 
 #include <stdbool.h>
@@ -16,12 +17,18 @@
 #include <dirent.h>
 
 #define USING_SENDFILE 1
+#define USING_MMAP_INSTEAD_READ 1
 #define DEBUG_MODE 0
 
 #if(DEBUG_MODE == 1)
 #define DEBUG_PRINT(...) {do{printf(__VA_ARGS__);}while(0);}
 #else
 #define DEBUG_PRINT(...)
+#endif
+
+#if (USING_MMAP_INSTEAD_READ == 1)
+static const char *g_mapped_pictures_addr = NULL;  // wondering why not size_t, but spec states char*
+static size_t g_mapped_pictures_size = NULL;
 #endif
 
 /**
@@ -126,6 +133,72 @@ void CreateIndexPage(struct THttpResponse* response, int page) {
     TStringBuilder_AppendCStr(&response->Body, INDEX_TEMPLATE_FOOTER);
 }
 
+#if (USING_MMAP_INSTEAD_READ == 1)
+void unmap_gmapped_pictured()
+{
+    if(MAP_FAILED == g_mapped_pictures_addr)
+    {
+        DEBUG_PRINT("g_mapped_pictures were not mapped\n");
+        return;
+    }
+
+    if(NULL == g_mapped_pictures_addr)
+    {
+        DEBUG_PRINT("pictures were not mapped before");
+        return;
+    }
+
+    if(0 != munmap(g_mapped_pictures_addr, g_mapped_pictures_size))
+    {
+        perror("unmap call failed");
+        return;
+    }
+}
+#endif
+
+#if (USING_MMAP_INSTEAD_READ == 1)
+static bool Load(int n, char** data, size_t* size)
+{
+    if(NULL == g_mapped_pictures_addr)
+    {
+        int fd = open(CIFAR_PATH, O_RDONLY);
+        if (-1 == fd)
+        {
+            perror("open error");
+            return false;
+        }
+
+        struct stat file_stat_buf;
+        if(stat(CIFAR_PATH, &file_stat_buf) < 0)
+        {
+            perror("stat error");
+            return false;
+        }
+        g_mapped_pictures_size = file_stat_buf.st_size;
+
+        g_mapped_pictures_addr = mmap(g_mapped_pictures_addr, file_stat_buf.st_size, PROT_READ, MAP_SHARED, fd, 0);
+        if (MAP_FAILED == g_mapped_pictures_addr)
+        {
+            perror("mmap");
+            close(fd);
+            return false;
+        }
+        close(fd);       
+    }
+
+    assert(NULL != g_mapped_pictures_addr);
+    
+    if((n * CIFAR_BLOB_SIZE) > (int) g_mapped_pictures_size)
+    {
+        return false;
+    }
+
+    uint8_t tmpBuf[CIFAR_BLOB_SIZE];
+    memcpy(tmpBuf, g_mapped_pictures_addr + n * CIFAR_BLOB_SIZE, CIFAR_BLOB_SIZE);
+    bool result = BuildBmpFileData(CIFAR_IMG_SIZE, CIFAR_IMG_SIZE, tmpBuf + 1, data, size);
+    return result;
+}
+#else
 static bool Load(int n, char** data, size_t* size) {
     int fd = open(CIFAR_PATH, O_RDONLY);
     if (fd == -1) {
@@ -145,6 +218,7 @@ static bool Load(int n, char** data, size_t* size) {
     close(fd);
     return result;
 }
+#endif
 
 void SendCifarBitmap(struct THttpResponse* response, int number) {
     char* data;
