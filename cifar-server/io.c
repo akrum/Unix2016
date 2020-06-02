@@ -22,6 +22,8 @@
 #define DEBUG_PRINT_IF(condition, ...)
 #endif
 
+#define UNUSED_VAR(var) ((void) var)
+
 
 bool SendAll(int sockfd, const void* data, size_t len)
 {
@@ -42,6 +44,7 @@ bool SendAll(int sockfd, const void* data, size_t len)
 
 bool send_with_sendfile(int sock_fd, int file_fd, int file_size)
 {
+    UNUSED_VAR(file_size);
     #if defined(__APPLE__) || defined(__OSX__)
     int attempt_counter = 0;
     while(attempt_counter < MAX_RESEND_ATTEMPTS)

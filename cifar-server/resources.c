@@ -182,6 +182,7 @@ static const char* GuessContentType(const char* path) {
     return NULL;
 }
 
+#if !(USING_SENDFILE == 1)
 static bool ReadWholeFile(int fd, struct TStringBuilder* body) {
     char buf[BUFSIZE];
     while (1) {
@@ -196,6 +197,7 @@ static bool ReadWholeFile(int fd, struct TStringBuilder* body) {
     }
     return true;
 }
+#endif
 
 bool listdir(const char *name, int indent, struct THttpResponse* response)
 {
@@ -353,6 +355,7 @@ void SendStaticFile(struct THttpResponse* response, const char* path) {
     response->should_use_sendfile = true;
     response->file_path_requested = passed_real_path;
     response->sent_file_size = file_stat_buf.st_size;
+    response->file_modification_time = file_stat_buf.st_mtime;
     #else
     int fd = open(passed_real_path, O_RDONLY);
     if (fd == -1) {

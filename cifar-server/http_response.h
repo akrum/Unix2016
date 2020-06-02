@@ -3,6 +3,7 @@
 #include "stringbuilder.h"
 
 #include <stdbool.h>
+#include <time.h>
 
 enum EHttpCode {
     HTTP_OK = 200,
@@ -19,6 +20,7 @@ struct THttpResponse {
     bool should_use_sendfile;
     char *file_path_requested;  // guaranteed that the field will be valid if should_use_sendfile is true
     size_t sent_file_size;  // specific field for sendfile
+    time_t file_modification_time;  // specific field for sendfile
 };
 
 const char* GetReasonPhrase(enum EHttpCode code);
