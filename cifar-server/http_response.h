@@ -18,6 +18,7 @@ struct THttpResponse {
     struct TStringBuilder Body;
     bool should_use_sendfile;
     char *file_path_requested;  // guaranteed that the field will be valid if should_use_sendfile is true
+    size_t sent_file_size;  // specific field for sendfile
 };
 
 const char* GetReasonPhrase(enum EHttpCode code);

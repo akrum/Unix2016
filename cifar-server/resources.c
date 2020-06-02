@@ -15,7 +15,7 @@
 #include <assert.h>
 #include <dirent.h>
 
-#define USING_SENDFILE 0
+#define USING_SENDFILE 1
 #define DEBUG_MODE 0
 
 #if(DEBUG_MODE == 1)
@@ -352,6 +352,7 @@ void SendStaticFile(struct THttpResponse* response, const char* path) {
     #if (USING_SENDFILE == 1)
     response->should_use_sendfile = true;
     response->file_path_requested = passed_real_path;
+    response->sent_file_size = file_stat_buf.st_size;
     #else
     int fd = open(passed_real_path, O_RDONLY);
     if (fd == -1) {

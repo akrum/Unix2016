@@ -13,6 +13,16 @@
 
 #define CRLF "\r\n"
 #define CONNECTION_KEEP_ALIVE "Connection: keep-alive"
+#define DEBUG_MODE 1
+
+#if(DEBUG_MODE == 1)
+#define DEBUG_PRINT(...) {do{printf(__VA_ARGS__);}while(0);}
+#define DEBUG_PRINT_IF(condition, ...) {do{if((condition)){printf(__VA_ARGS__);};}while(0);}
+#else
+#define DEBUG_PRINT(...)
+#define DEBUG_PRINT_IF(condition, ...)
+#endif
+
 
 const char* GetReasonPhrase(enum EHttpCode code) {
     switch (code) {
@@ -36,11 +46,16 @@ void THttpResponse_Init(struct THttpResponse* self) {
     self->ContentType = NULL;
     self->should_use_sendfile = false;
     self->file_path_requested = NULL;
+    self->sent_file_size = 0;
     TStringBuilder_Init(&self->Body);
 }
 
 bool THttpResponse_Send(struct THttpResponse* self, int sockfd) {
-    const size_t contentLength = self->Body.Length;
+    size_t contentLength = self->Body.Length;
+    if(self->should_use_sendfile)
+    {
+        contentLength = self->sent_file_size;
+    }
 
     struct TStringBuilder headers;
     TStringBuilder_Init(&headers);
@@ -73,6 +88,7 @@ bool THttpResponse_Send(struct THttpResponse* self, int sockfd) {
     {
         assert(self->file_path_requested != NULL);
         int sent_file_fd = open(self->file_path_requested, O_RDONLY);
+        DEBUG_PRINT("sending file %s\n", self->file_path_requested);
         
         if (sent_file_fd == -1) 
         {
@@ -82,7 +98,7 @@ bool THttpResponse_Send(struct THttpResponse* self, int sockfd) {
             return false;
         }
 
-        result &= send_with_sendfile(sockfd, sent_file_fd);
+        result &= send_with_sendfile(sockfd, sent_file_fd, self->sent_file_size);
         close(sent_file_fd);
     }
 
