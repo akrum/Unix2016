@@ -18,7 +18,7 @@
 
 #define USING_SENDFILE 1
 #define USING_MMAP_INSTEAD_READ 1
-#define DEBUG_MODE 0
+#define DEBUG_MODE 1
 
 #if(DEBUG_MODE == 1)
 #define DEBUG_PRINT(...) {do{printf(__VA_ARGS__);}while(0);}
@@ -148,7 +148,7 @@ void unmap_gmapped_pictured()
         return;
     }
 
-    if(0 != munmap(g_mapped_pictures_addr, g_mapped_pictures_size))
+    if(0 != munmap((void *)g_mapped_pictures_addr, g_mapped_pictures_size))
     {
         perror("unmap call failed");
         return;
@@ -157,8 +157,9 @@ void unmap_gmapped_pictured()
 #endif
 
 #if (USING_MMAP_INSTEAD_READ == 1)
-static bool Load(int n, char** data, size_t* size)
+bool preload_pictures()
 {
+    DEBUG_PRINT("preloading pictures\n");
     if(NULL == g_mapped_pictures_addr)
     {
         int fd = open(CIFAR_PATH, O_RDONLY);
@@ -176,7 +177,47 @@ static bool Load(int n, char** data, size_t* size)
         }
         g_mapped_pictures_size = file_stat_buf.st_size;
 
-        g_mapped_pictures_addr = mmap(g_mapped_pictures_addr, file_stat_buf.st_size, PROT_READ, MAP_SHARED, fd, 0);
+        g_mapped_pictures_addr = mmap((void *)g_mapped_pictures_addr, file_stat_buf.st_size, PROT_READ, MAP_SHARED, fd, 0);
+        if (MAP_FAILED == g_mapped_pictures_addr)
+        {
+            perror("mmap");
+            close(fd);
+            return false;
+        }
+        close(fd);       
+    }
+    DEBUG_PRINT("preload succeeded\n");
+    return true;
+}
+#else
+bool preload_pictures()
+{
+    return true;
+}
+#endif
+
+#if (USING_MMAP_INSTEAD_READ == 1)
+static bool Load(int n, char** data, size_t* size)
+{
+    if(NULL == g_mapped_pictures_addr)
+    {
+        DEBUG_PRINT("preloading pictures using mmap\n");
+        int fd = open(CIFAR_PATH, O_RDONLY);
+        if (-1 == fd)
+        {
+            perror("open error");
+            return false;
+        }
+
+        struct stat file_stat_buf;
+        if(stat(CIFAR_PATH, &file_stat_buf) < 0)
+        {
+            perror("stat error");
+            return false;
+        }
+        g_mapped_pictures_size = file_stat_buf.st_size;
+
+        g_mapped_pictures_addr = mmap((void *)g_mapped_pictures_addr, file_stat_buf.st_size, PROT_READ, MAP_SHARED, fd, 0);
         if (MAP_FAILED == g_mapped_pictures_addr)
         {
             perror("mmap");

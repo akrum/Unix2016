@@ -1,6 +1,7 @@
 #include "server.h"
 
 #include "handler.h"
+#include "resources.h"
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -137,11 +138,18 @@ static bool IgnoreSignal(int sigNum) {
 }
 
 bool RunServer(uint16_t port) {
-    if (!IgnoreSignal(SIGCHLD) || !IgnoreSignal(SIGPIPE)) {
+    if(!preload_pictures())
+    {
+        return false;
+    }
+    
+    if (!IgnoreSignal(SIGCHLD) || !IgnoreSignal(SIGPIPE))
+    {
         return false;
     }
     int sockfd = CreateSocketToListen(port);
-    if (sockfd == -1) {
+    if (sockfd == -1)
+    {
         return false;
     }
     printf("server: waiting for connections on http://localhost:%hu/\n", port);

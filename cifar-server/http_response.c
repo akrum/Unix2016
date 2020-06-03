@@ -14,7 +14,7 @@
 
 #define CRLF "\r\n"
 #define CONNECTION_KEEP_ALIVE "Connection: keep-alive"
-#define DEBUG_MODE 1
+#define DEBUG_MODE 0
 #define TIME_BUFFER_SIZE 1000
 
 #if(DEBUG_MODE == 1)
