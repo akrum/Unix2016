@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include <errno.h>
 #include <stdio.h>
@@ -19,6 +20,8 @@
 
 #define BACKLOG 10   // how many pending connections queue will hold
 #define SHOULD_USE_TCP_CORK 0
+#define SHOULD_USE_THREADS 1
+#define NUM_THREADS 5
 #define DEBUG_MODE 1
 
 #if(DEBUG_MODE == 1)
@@ -99,6 +102,81 @@ static int CreateSocketToListen(uint16_t port) {
     return sockfd;
 }
 
+#if (SHOULD_USE_THREADS)
+void* server_thread_main(void* serve_fd_ptr)
+{
+    int serve_fd = *((int *) serve_fd_ptr);
+    DEBUG_PRINT("thread will work with fd: %d\n", serve_fd);
+
+    ServeClient(serve_fd);
+    close(serve_fd);
+    
+    return NULL;
+}
+
+static bool RunServerImpl(int sockfd)
+{
+    if (listen(sockfd, BACKLOG) == -1)
+    {
+        perror("listen");
+        return false;
+    }
+
+    int thread_array_index = 0;
+    int create_thread_result = -1;
+    int thread_await_result = -1;
+
+    pthread_t *created_threads[NUM_THREADS];
+    int created_thread_fd_args[NUM_THREADS];
+    memset(created_threads, 0, sizeof(pthread_t *) * NUM_THREADS); // initially all threads are zero pointers
+
+    while (1)
+    {  // main accept() loop
+        struct sockaddr_storage theirAddr;
+        socklen_t addrSize = sizeof theirAddr;
+        int newfd = accept(sockfd, (struct sockaddr*)&theirAddr, &addrSize);
+        if (-1 == newfd) {
+            perror("accept");
+            continue;
+        }
+
+        DEBUG_PRINT("received new connection so creating new process\n");
+
+        bool thread_creation_succeeded = false;
+        while(!thread_creation_succeeded)
+        {
+            if(NULL == created_threads[thread_array_index])
+            {
+                created_threads[thread_array_index] = malloc(sizeof(pthread_t));
+                memset(created_threads[thread_array_index], 0, sizeof(pthread_t));
+                created_thread_fd_args[thread_array_index] = newfd;
+
+                DEBUG_PRINT("passing fd %d to thread\n", created_thread_fd_args[thread_array_index]);
+                create_thread_result = pthread_create(created_threads[thread_array_index], NULL, server_thread_main, (void*) &created_thread_fd_args[thread_array_index]);
+                if (NULL != create_thread_result)
+                {
+                    free(created_threads[thread_array_index]);
+                    created_threads[thread_array_index] = NULL;
+                    created_thread_fd_args[thread_array_index] = -1;
+                }
+                thread_creation_succeeded = true;
+                thread_array_index = (thread_array_index + 1) % NUM_THREADS;
+            }
+            else
+            {
+                thread_await_result = pthread_join(created_threads[thread_array_index], NULL);
+                DEBUG_PRINT_IF(NULL != thread_await_result, "thread join error!, skipping\n");
+
+                free(created_threads[thread_array_index]);
+                created_threads[thread_array_index] = NULL;
+                created_thread_fd_args[thread_array_index] = -1;
+
+                thread_creation_succeeded = false;
+            }
+        }
+    }
+}
+#else
 static bool RunServerImpl(int sockfd) {
     if (listen(sockfd, BACKLOG) == -1) {
         perror("listen");
@@ -135,6 +213,7 @@ static bool RunServerImpl(int sockfd) {
         close(newfd); // parent doesn't need this
     }
 }
+#endif
 
 static bool IgnoreSignal(int sigNum) {
     struct sigaction sa;
