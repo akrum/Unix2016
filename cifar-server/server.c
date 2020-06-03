@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -16,6 +17,7 @@
 #include <string.h>
 
 #define BACKLOG 10   // how many pending connections queue will hold
+#define SHOULD_USE_TCP_CORK 0
 #define DEBUG_MODE 1
 
 #if(DEBUG_MODE == 1)
@@ -57,6 +59,15 @@ static int CreateSocketToListen(uint16_t port) {
             close(sockfd);
             continue;
         }
+
+#if (SHOULD_USE_TCP_CORK)
+        yes = 1;
+        if (setsockopt(sockfd, IPPROTO_TCP, TCP_CORK, &yes, sizeof(int)) == -1) {
+            perror("setsockopt");
+            close(sockfd);
+            continue;
+        }
+#endif
 
         if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
             perror("server: bind");
