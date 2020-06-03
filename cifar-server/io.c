@@ -66,7 +66,26 @@ bool send_with_sendfile(int sock_fd, int file_fd, int file_size)
         return true;
     }
     #else
-    assert(false);  // not implemented
+    // TODO: may be unstable
+    int attempt_counter = 0;
+    while(attempt_counter < MAX_RESEND_ATTEMPTS)
+    {
+        off_t offset = 0;
+        off_t bytes_sent = 0;
+        ssize_t ret = sendfile(sock_fd, file_fd, 0, file_size);
+        if(ret == -1)
+        {
+            if (errno == EINTR || errno == EAGAIN) 
+            {
+                DEBUG_PRINT("sendfile error, trying again\n");
+                attempt_counter++;
+                continue;
+            }
+            perror("sendfile error:");
+            return false;
+        }
+        return true;
+    }
     #endif
 
     return false;
