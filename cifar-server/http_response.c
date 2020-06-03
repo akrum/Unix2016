@@ -121,6 +121,11 @@ bool THttpResponse_Send(struct THttpResponse* self, int sockfd) {
     return result;
 }
 
-void THttpResponse_Destroy(struct THttpResponse* self) {
+void THttpResponse_Destroy(struct THttpResponse* self)
+{
+    if (NULL != self->file_path_requested)
+    {
+        free(self->file_path_requested);  // freeing passed_real_path created by realpath in SendStaticFile
+    }
     TStringBuilder_Destroy(&self->Body);
 }

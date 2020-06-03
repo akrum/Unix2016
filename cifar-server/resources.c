@@ -409,7 +409,7 @@ void SendStaticFile(struct THttpResponse* response, const char* path) {
     if(stat(passed_real_path, &file_stat_buf) < 0)
     {
         perror("dir stat error:");
-        
+        CreateErrorPage(response, HTTP_INTERNAL_SERVER_ERROR);
         return;
     }
     
@@ -430,6 +430,9 @@ void SendStaticFile(struct THttpResponse* response, const char* path) {
     response->file_path_requested = passed_real_path;
     response->sent_file_size = file_stat_buf.st_size;
     response->file_modification_time = file_stat_buf.st_mtime;
+
+    // passed_real_path will be used later so can not be freed here
+    free(static_real_path);
     #else
     int fd = open(passed_real_path, O_RDONLY);
     if (fd == -1) {
@@ -442,5 +445,7 @@ void SendStaticFile(struct THttpResponse* response, const char* path) {
         CreateErrorPage(response, HTTP_INTERNAL_SERVER_ERROR);
     }
     close(fd);
+    free(passed_real_path);
+    free(static_real_path);
     #endif
 }
