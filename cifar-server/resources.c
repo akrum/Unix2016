@@ -433,6 +433,7 @@ void SendStaticFile(struct THttpResponse* response, const char* path) {
 
     // passed_real_path will be used later so can not be freed here
     free(static_real_path);
+    free(path_decoded);
     #else
     int fd = open(passed_real_path, O_RDONLY);
     if (fd == -1) {
@@ -447,5 +448,6 @@ void SendStaticFile(struct THttpResponse* response, const char* path) {
     close(fd);
     free(passed_real_path);
     free(static_real_path);
+    free(path_decoded);
     #endif
 }
