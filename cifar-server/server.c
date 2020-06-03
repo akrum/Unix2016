@@ -18,7 +18,7 @@
 #include <string.h>
 
 #define BACKLOG 10   // how many pending connections queue will hold
-#define SHOULD_USE_TCP_CORK 0
+#define SHOULD_USE_TCP_CORK 1
 #define DEBUG_MODE 1
 
 #if(DEBUG_MODE == 1)
@@ -62,13 +62,24 @@ static int CreateSocketToListen(uint16_t port) {
         }
 
 #if (SHOULD_USE_TCP_CORK)
+#if !(defined(__APPLE__) || defined(__OSX__))
         yes = 1;
-        if (setsockopt(sockfd, IPPROTO_TCP, TCP_CORK, &yes, sizeof(int)) == -1) {
+        if (setsockopt(sockfd, IPPROTO_TCP, TCP_CORK, &yes, sizeof(int)) == -1)
+        {
             perror("setsockopt");
             close(sockfd);
             continue;
         }
-#endif
+#else  // __APPLE__ or __OSX__ is defined
+        yes = 1;
+        if(setsockopt(sockfd, IPPROTO_TCP, TCP_NOPUSH, &yes, sizeof(int)) == -1)
+        {
+            perror("setsockopt tcp_nopush");
+            close(sockfd);
+            continue;
+        }
+#endif // __APPLE__
+#endif // SHOULD_USE_TCP_CORK
 
         if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
             perror("server: bind");
