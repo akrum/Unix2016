@@ -109,7 +109,6 @@ bool THttpResponse_Send(struct THttpResponse* self, int sockfd) {
         {
             perror("open file:");
             printf("fd is -1\n");
-            CreateErrorPage(self, HTTP_NOT_FOUND);
             return false;
         }
 
