@@ -288,35 +288,58 @@ bool listdir(const char *name, int indent, struct THttpResponse* response)
 
     for(entry = readdir(dir); entry != NULL; entry = readdir(dir)) {
         if (DT_DIR == entry->d_type) {
-            char path[1024];
+            struct TStringBuilder path;
+            TStringBuilder_Init(&path);
+
             if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
                 continue;
-            snprintf(path, sizeof(path), "%s/%s", name, entry->d_name);
+            
+            TStringBuilder_Sprintf(&path, "%s/%s", name, entry->d_name);
+            char *shortend_path = strstr(path.Data, "/static");
 
-            TStringBuilder_AppendCStr(&response->Body, "<p>\n");
+            if(NULL != shortend_path)
+            {
+                TStringBuilder_Sprintf(&response->Body, "<div><a href=\"%s\">", shortend_path);
+            }
+            else
+            {
+                TStringBuilder_AppendCStr(&response->Body, "<div><a href=\"\">");
+            }
+            
             for(int i = 0; i < indent; i++)
             {
-                TStringBuilder_Sprintf(&response->Body, "%s", "-");
+                TStringBuilder_AppendCStr(&response->Body, "-");
             }
-
             TStringBuilder_Sprintf(&response->Body, "[%s]\n", entry->d_name);
-            TStringBuilder_AppendCStr(&response->Body, "</p>\n");
+            TStringBuilder_AppendCStr(&response->Body, "</a></div>\n");
 
-            is_success = listdir(path, indent + 1, response) & is_success;
+            is_success = listdir(path.Data, indent + 1, response) & is_success;
             if(!is_success)
             {
+                TStringBuilder_Destroy(&path);
                 return false;
             }
+            TStringBuilder_Destroy(&path);
         }
         else
         {
-            TStringBuilder_AppendCStr(&response->Body, "<p>\n");
+            char *shortend_path = strstr(name, "/static");
+            if(NULL != shortend_path)
+            {
+                TStringBuilder_Sprintf(&response->Body, "<div><a href=\"%s/%s\">", shortend_path, entry->d_name);
+            }
+            else
+            {
+                TStringBuilder_AppendCStr(&response->Body, "<div><a href=\"\">");
+            }
+
             for(int i = 0; i < indent; i++)
             {
-                TStringBuilder_Sprintf(&response->Body, "%s", "-");
+                TStringBuilder_AppendCStr(&response->Body, "-");
             }
             TStringBuilder_Sprintf(&response->Body,"%s\n", entry->d_name);
-            TStringBuilder_AppendCStr(&response->Body, "</p>\n");
+            
+            TStringBuilder_AppendCStr(&response->Body, "</a></div>\n");
         }
     }
     closedir(dir);
