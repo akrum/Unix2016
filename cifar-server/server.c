@@ -18,7 +18,7 @@
 #include <string.h>
 
 #define BACKLOG 10   // how many pending connections queue will hold
-#define SHOULD_USE_TCP_CORK 1
+#define SHOULD_USE_TCP_CORK 0
 #define DEBUG_MODE 1
 
 #if(DEBUG_MODE == 1)
