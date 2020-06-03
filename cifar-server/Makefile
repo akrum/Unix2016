@@ -1,7 +1,7 @@
 TARGET = cifar-server
 TEST_TARGET = testapp
 
-CFLAGS += -Wall -Wextra --std=gnu99 -g -O0 -D_GNU_SOURCE -MMD
+CFLAGS += -Wall -Wextra --std=gnu99 -g -O0 -D_GNU_SOURCE -MMD -pthread
 
 SRCS = \
 	bmp.c \
