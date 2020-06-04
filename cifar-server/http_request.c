@@ -1,4 +1,5 @@
 #include "http_request.h"
+#include "config.h"
 
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -10,9 +11,7 @@
 #include <string.h>
 #include <poll.h>
 
-#define RECV_BUF_SIZE 4096
 #define CONNECTION_KEEP_ALIVE "Connection: keep-alive"
-#define TIMEOUT_FOR_KEEP_ALIVE_CONNECTIONS 10 * 1000  // 10 seconds
 
 /**
  * THttpRequest

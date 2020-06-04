@@ -1,4 +1,5 @@
 #include "io.h"
+#include "config.h"
 
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -11,8 +12,7 @@
 #include <errno.h>
 #include <stdio.h>
 
-#define MAX_RESEND_ATTEMPTS 5
-#define DEBUG_MODE 0
+#define DEBUG_MODE IO_C_DEBUG_MODE
 
 #if(DEBUG_MODE == 1)
 #define DEBUG_PRINT(...) {do{printf(__VA_ARGS__);}while(0);}

@@ -4,6 +4,7 @@
 #include "http_response.h"
 #include "resources.h"
 #include "stringutils.h"
+#include "config.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -18,7 +19,7 @@ static const char* SafeStr(const char* value) {
 }
 #endif
 
-#define DEBUG_MODE 0
+#define DEBUG_MODE HANDLER_DEBUG_MODE
 
 #if(DEBUG_MODE == 1)
 #define DEBUG_PRINT(...) {do{printf(__VA_ARGS__);}while(0);}

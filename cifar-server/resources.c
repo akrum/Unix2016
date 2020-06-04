@@ -1,5 +1,5 @@
 #include "resources.h"
-
+#include "config.h"
 #include "bmp.h"
 #include "stringutils.h"
 
@@ -16,9 +16,7 @@
 #include <assert.h>
 #include <dirent.h>
 
-#define USING_SENDFILE 1
-#define USING_MMAP_INSTEAD_READ 1
-#define DEBUG_MODE 1
+#define DEBUG_MODE RESOURCES_DEBUG_MODE
 
 #if(DEBUG_MODE == 1)
 #define DEBUG_PRINT(...) {do{printf(__VA_ARGS__);}while(0);}

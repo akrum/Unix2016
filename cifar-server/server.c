@@ -17,12 +17,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "config.h"
 
-#define BACKLOG 10   // how many pending connections queue will hold
-#define SHOULD_USE_TCP_CORK 0
-#define SHOULD_USE_THREADS 1
-#define NUM_THREADS 5
-#define DEBUG_MODE 1
+#define DEBUG_MODE SERVER_DEBUG_MODE
 
 #if(DEBUG_MODE == 1)
 #define DEBUG_PRINT(...) {do{printf(__VA_ARGS__);}while(0);}
