@@ -1,4 +1,5 @@
 #include "server.h"
+#include "config.h"
 
 #include "handler.h"
 #include "resources.h"
@@ -17,7 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "config.h"
+#include <assert.h>
 
 #define DEBUG_MODE SERVER_DEBUG_MODE
 
@@ -100,6 +101,7 @@ static int CreateSocketToListen(uint16_t port) {
 }
 
 #if (SHOULD_USE_THREADS)
+#if !(USING_THREAD_POOL)
 void* server_thread_main(void* serve_fd_ptr)
 {
     int serve_fd = *((int *) serve_fd_ptr);
@@ -173,7 +175,153 @@ static bool RunServerImpl(int sockfd)
         }
     }
 }
-#else
+#else  // if using thread pool
+
+typedef enum thread_state
+{
+    THREAD_STATE_INITIAL,
+    THREAD_STATE_RUNNING,
+    THREAD_STATE_AWAITING_TASK,
+    THREAD_STATE_PREPARE_FOR_TASK,
+    THREAD_STATE_STOPPED,
+} thread_state_t;
+
+static volatile thread_state_t current_thread_states[NUM_THREADS];
+static volatile int created_thread_fd_args[NUM_THREADS];
+
+static pthread_mutex_t global_thread_mutexes[NUM_THREADS];
+static pthread_cond_t global_conditions[NUM_THREADS];
+
+void* server_thread_main(void* thread_index_ptr)
+{
+    int thread_index = *((int *) thread_index_ptr);
+    pthread_mutex_t *mutex_ptr = &global_thread_mutexes[thread_index];
+    pthread_cond_t *condition_ptr = &global_conditions[thread_index];
+
+
+    while(THREAD_STATE_STOPPED != current_thread_states[thread_index])
+    {
+        switch(current_thread_states[thread_index])
+        {
+            case THREAD_STATE_INITIAL:
+            {
+                current_thread_states[thread_index] = THREAD_STATE_PREPARE_FOR_TASK;
+                break;
+            }
+            case THREAD_STATE_PREPARE_FOR_TASK:
+            {
+                pthread_mutex_lock(mutex_ptr);
+                created_thread_fd_args[thread_index] = -1;
+                current_thread_states[thread_index] = THREAD_STATE_AWAITING_TASK;
+                pthread_mutex_unlock(mutex_ptr);
+            }
+            case THREAD_STATE_AWAITING_TASK:
+            {
+                pthread_cond_wait(condition_ptr, mutex_ptr);
+                pthread_mutex_unlock(mutex_ptr);
+
+                current_thread_states[thread_index] = THREAD_STATE_RUNNING;
+                break;
+            }
+            case THREAD_STATE_RUNNING:
+            {
+                DEBUG_PRINT("thread %d is running the task\n", thread_index);
+                DEBUG_PRINT_IF(-1 == created_thread_fd_args[thread_index], "received wrond fd!\n");
+                ServeClient(created_thread_fd_args[thread_index]);
+                close(created_thread_fd_args[thread_index]);
+                DEBUG_PRINT("thread %d has finished the task\n", thread_index);
+
+                current_thread_states[thread_index] = THREAD_STATE_PREPARE_FOR_TASK;
+                break;
+            }
+            default:
+                assert(false);  // unreachable
+        }
+    }
+    
+    return NULL;
+}
+
+static bool RunServerImpl(int sockfd)
+{
+    if (listen(sockfd, BACKLOG) == -1)
+    {
+        perror("listen");
+        return false;
+    }
+
+    int create_thread_result = -1;
+    int thread_await_result = -1;
+
+    pthread_t* created_threads = calloc(NUM_THREADS, sizeof(pthread_t *));
+    static volatile int created_thread_index_args[NUM_THREADS];
+
+    memset(current_thread_states, THREAD_STATE_INITIAL, sizeof(thread_state_t) * NUM_THREADS);
+    memset(created_thread_fd_args, 0, sizeof(int) * NUM_THREADS);
+    memset(created_thread_index_args, -1, sizeof(int) * NUM_THREADS);
+
+    for(int i = 0; i < NUM_THREADS; i++)
+    {
+        pthread_mutex_init(&global_thread_mutexes[i], NULL);
+        pthread_cond_init(&global_conditions[i], NULL);
+
+        bool is_creation_successful = false;
+        while(!is_creation_successful)
+        {
+            created_threads[i] = malloc(sizeof(pthread_t));
+            memset(created_threads[i], 0, sizeof(pthread_t));
+
+            created_thread_index_args[i] = i;
+            DEBUG_PRINT("passing index %d to thread\n", created_thread_index_args[i]);
+            create_thread_result = pthread_create(created_threads[i], NULL, server_thread_main, (void*) &created_thread_index_args[i]);
+            if (NULL != create_thread_result)
+            {
+                free(created_threads[i]);
+                created_threads[i] = NULL;
+                created_thread_index_args[i] = -1;
+                continue;
+            }
+            is_creation_successful = true;
+        }
+    }
+
+    while (TRUE)
+    {  // main accept() loop
+        struct sockaddr_storage theirAddr;
+        socklen_t addrSize = sizeof theirAddr;
+        int newfd = accept(sockfd, (struct sockaddr*)&theirAddr, &addrSize);
+        if (-1 == newfd) {
+            perror("accept");
+            continue;
+        }
+
+        DEBUG_PRINT("received new connection so searching for non-active thread\n");
+        int thread_index = 0;
+        bool found_victim_thread = false;
+
+        while(!found_victim_thread)
+        {
+            pthread_mutex_lock(&global_thread_mutexes[thread_index]);
+            if(THREAD_STATE_AWAITING_TASK == current_thread_states[thread_index])
+            {
+                found_victim_thread = true;
+                DEBUG_PRINT("thread %d is not active, so assigning the task to it\n", thread_index);
+            }
+            pthread_mutex_unlock(&global_thread_mutexes[thread_index]);
+            if(!found_victim_thread)
+            {
+                thread_index = (thread_index + 1) % NUM_THREADS;
+            }
+        }
+
+        pthread_mutex_lock(&global_thread_mutexes[thread_index]);
+        created_thread_fd_args[thread_index] = newfd;
+        pthread_cond_signal(&global_conditions[thread_index]);
+        pthread_mutex_unlock(&global_thread_mutexes[thread_index]);
+    }
+}
+#endif // !(USING_THREAD_POOL)
+#else  // (SHOULD_USE_THREADS)
 static bool RunServerImpl(int sockfd) {
     if (listen(sockfd, BACKLOG) == -1) {
         perror("listen");

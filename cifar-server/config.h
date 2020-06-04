@@ -5,11 +5,12 @@
 #define FALSE 0
 
 // server config
-#define SERVER_DEBUG_MODE FALSE
+#define SERVER_DEBUG_MODE TRUE
 
 #define BACKLOG 10   // how many pending connections queue will hold
 #define SHOULD_USE_TCP_CORK FALSE
 #define SHOULD_USE_THREADS TRUE
+#define USING_THREAD_POOL TRUE
 #define NUM_THREADS 5
 
 
